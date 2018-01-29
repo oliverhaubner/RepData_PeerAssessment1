@@ -1,25 +1,118 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Course Project 1 Activity Monitoring"
+author: "Oliver Haubner"
+date: "28 Januar 2018"
+output: md_document
 ---
 
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+***
+#Loading and Preprocessing the Data
+```{r, echo = TRUE, message = FALSE}
+setwd("~/COURSERA/Reproducible Research/Week2/repdata%2Fdata%2Factivity")
+activity <- read.csv("activity.csv", header = TRUE, stringsAsFactors = FALSE, na.strings = "NA")
+head(activity)
+library(dplyr)
+activity <- mutate(activity, date = as.Date(date, format = "%Y-%m-%d"))
+activityTidy <- activity[!is.na(activity$steps),]
+```
 
 
+***
+#What is the mean total number of steps taken each day?
+1. Calculate the total number of steps per day
+```{r, echo = TRUE, message = FALSE}
+sumStep = aggregate(steps~date, activityTidy, sum)
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+2. Make a histogram of the total number of steps taken each day
+```{r}
+png(filename = "Plot1.png")
+hist(sumStep$steps, main = "Histogram of steps per day", xlab = "Sum of steps per day")
+dev.off()
+```
+
+3. Calculate and report the mean and median of the total number of steps taken per day
+```{r, echo = TRUE, message = FALSE}
+mean(sumStep$steps, na.rm = T)
+median(sumStep$steps, na.rm = T)
+```
+
+####The daily median is **`r median(sumStep$steps, na.rm = T)`**
+####The daily mean is **10766.19**
+
+***
+#What is the average daily activity pattern?
+
+1. Make a time series plot
+
+```{r}
+avgStep = aggregate(steps~interval, activityTidy, mean)
+png(filename = "Plot2.png")
+plot(avgStep, type = "l", main = "Plot of average steps per interval", sub = "averaged across all observed days, ignoring NAs", xlab = "5min Intervals", ylab = "Number of steps")
+dev.off()
+```
+
+2. Find interval with maximum number of steps
+```{r}
+maxIdx = which.max(avgStep$steps)
+maxInterval = avgStep[maxIdx, 'interval']
+maxAvgStep = avgStep[maxIdx, 'steps']
+```
+####The interval **`r maxInterval`** is the maximum interval with **`r maxAvgStep`** steps.
+
+
+***
+#Imputing missing values
+
+1. Calculate and report number of missing values
+```{r}
+totalNA = sum(is.na(activity$steps))
+```
+####The total number of missing values for steps is **`r totalNA`**
+
+2. Devise a strategy for filling out missing values  
+--> Replace every NA with the calculated average for the respective time interval
+
+3. Create new dataset with the missing data filled in
+```{r}
+naIdx = which(is.na(activity$steps))
+naInterval = activity[naIdx, 3]
+fillSteps = sapply(naInterval, function(x) {avgStep[(avgStep$interval==x), 2]})
+
+activityFill = activity
+activityFill[naIdx, 'steps'] = fillSteps
+
+sumStepFill = aggregate(steps~date, activityFill, sum)
+```
+
+4. Histogram of new dataset (sumStepFill)
+```{r}
+png(filename = "Plot3.png")
+hist(sumStepFill$steps, main = "Histogram of steps per day (After Imputation)", xlab = "Sum of steps per day")
+dev.off()
+
+mean(sumStepFill$steps, na.rm = T)
+median(sumStepFill$steps, na.rm = T)
+```
+
+
+#####The mean has not changed after imputing the NAs. The median, however, has changed its value after the modification of the data.
+
+***
+#Differences in activity patterns between weekdays and weekends
+
+```{r}
+##Add new column to activityFill dataframe to indicate weekday (output is in German in my case)
+activityFill2 <- activityFill
+activityFill2$weekday <- weekdays(activityFill2$date)
+activityFill2$weekend <- activityFill2$weekday%in%c("Samstag", "Sonntag")
+head(activityFill2)
+
+##Plot
+library(lattice)
+png(filename= "Plot4.png")
+xyplot(steps ~ interval | weekend, data = activityFill2, layout = c(1, 2), main = "Avg. steps per interval on weekends [above] and on weekdays [below]")
+dev.off()
+```
+
+
